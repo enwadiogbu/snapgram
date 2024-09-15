@@ -17,13 +17,28 @@ import { useToast } from "../../hooks/use-toast";
 import { SignupValidation } from "../../lib/validation";
 import { Input } from "../../components/ui/input";
 import Loader from "../../components/shared/Loader";
-import { Link } from "react-router-dom";
-import { createUserAccount } from "../../lib/appwrite/api";
+import { Link, useNavigate } from "react-router-dom";
+
+import {
+  useCreateUserAccount,
+  useSignInAccount,
+} from "../../lib/react-query/queriesAndMutations";
+
+import { useUserContext } from "../../context/authContext";
 
 const SignUpForm = () => {
   const { toast } = useToast();
-  const isLoading = false;
+  const { checkAuthUer, isLoading: isUserLoading } = useUserContext();
+  const navigate = useNavigate();
+
   // 1. Define your form.
+
+  const { mutateAsync: createUserAccount, isLoading: isCreatingAccount } =
+    useCreateUserAccount();
+
+  const { mutateAsync: signInAccount, isLoading: isSigningIn } =
+    useSignInAccount();
+
   const form = useForm<z.infer<typeof SignupValidation>>({
     resolver: zodResolver(SignupValidation),
     defaultValues: {
@@ -44,8 +59,25 @@ const SignUpForm = () => {
       });
     }
 
-    // const session = await signInAccount();
+    const session = await signInAccount({
+      email: values.email,
+      password: values.password,
+    });
+    if (!session) {
+      return toast({ title: "Sign in failed. Please try again." });
+    }
+
+    const isLoggedIn = await checkAuthUer();
+
+    if (isLoggedIn) {
+      form.reset();
+
+      navigate("/");
+    } else {
+      return toast({ title: "Sign up failed. Please try again." });
+    }
   }
+
   return (
     <Form {...form}>
       <div className="sm:w-420 flex-center flex-col">
@@ -118,7 +150,7 @@ const SignUpForm = () => {
             )}
           />
           <Button type="submit" className="shad-button_primary">
-            {isLoading ? (
+            {isCreatingAccount ? (
               <div className="flex-center gap-2">
                 <Loader />
                 Loading...
